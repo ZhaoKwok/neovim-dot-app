@@ -97,5 +97,5 @@ class Vim: public Client
 
 
     private:
-        Process process;
+        Process* process = nullptr;
 };

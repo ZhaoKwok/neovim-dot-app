@@ -7,10 +7,27 @@
 #include "client.h"
 #include "process.h"
 
+
+static ssize_t safe_write(int fildes, const void* buf, size_t nbyte)
+{
+    const uint8_t* p_buf = static_cast<const uint8_t*>(buf);
+    while (nbyte) {
+        ssize_t r = write(fildes, p_buf, nbyte);
+        if (r < 0) return r;
+        nbyte -= r;
+        p_buf += nbyte;
+    }
+    return nbyte;
+}
+
 Client::Client(Process &process):
     process(process),
     next_id(0)
 {
+    if (process.get_stdin() < 0 || process.get_stdout() < 0) {
+        std::cerr << "bad process! exiting...\n";
+        exit(-1);
+    }
     pthread_mutex_init(&mutex, 0);
 }
 
@@ -22,7 +39,7 @@ Client::~Client()
 /* Send an arbitrary string to the other process's stdin */
 void Client::send(const std::string &message)
 {
-    write(process.get_stdin(), &message[0], message.size());
+    safe_write(process.get_stdin(), &message[0], message.size());
 }
 
 /* Block until something happens */
@@ -112,8 +129,13 @@ again:
         if (sz == 0) {
             Event r = {0, std::string("neovim.app.nodata")};
             char errmsg[2048];
-            if (read(pstderr, &errmsg, sizeof(errmsg)) != -1)
-                std::cerr << errmsg << "\n";
+            if (pstderr >= 0) {
+                if (read(pstderr, &errmsg, sizeof(errmsg)) != -1)
+                    std::cerr << errmsg << "\n";
+            }
+            else {
+                std::cerr << "Connection closed but there's no stderr to output." << "\n";
+            }
             return r;
         }
 

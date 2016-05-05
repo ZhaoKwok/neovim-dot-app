@@ -24,9 +24,14 @@ const char **vim_create_argv(const std::vector<char *> &args)
     return (const char **)&(*argv)[0];
 }
 
-Vim::Vim(const char *vim_path, const std::vector<char *> &args):
-    process(vim_path, vim_create_argv(args)),
-    Client(process)
+Process* create_process(const char *vim_path, const std::vector<char *> &args)
+{
+    return dynamic_cast<Process*>(
+        new RemoteProcess("127.0.0.1", 6669, vim_path, vim_create_argv(args)));
+}
+
+Vim::Vim(const char *vim_path, const std::vector<char *> &args)
+    : Client(*create_process(vim_path, args))
 {
 }
 
